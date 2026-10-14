@@ -32,7 +32,7 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          grep -nE "error:|e: |What went wrong|FAILED|Could not|Execution failed|> " build.log | head -40 | while IFS= read -r line; do echo "::error::${line}"; done
+          grep -vE "^> Task" build.log | grep -A3 -E "error:|What went wrong|ERROR:|Failed|failed" | grep -vE "^\s*$|^--$" | head -9 | tr '\n' '\0' | xargs -0 -I{} echo "::error::{}"
 
       - name: Name the APK
         run: |
