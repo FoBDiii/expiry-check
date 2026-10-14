@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Expiry Check</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<meta name="theme-color" content="#1f5c4a">
+<style>
+:root {
+  --bg: #f1f3ee;
+  --surface: #ffffff;
+  --ink: #18241f;
+  --muted: #5d6b64;
+  --line: #d8ddd5;
+  --accent: #1f5c4a;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcebe4;
+  --soon: #8a5300;
+  --soon-soft: #fbeccf;
+  --today: #b34700;
+  --today-soft: #fde2cc;
+  --bad: #a8232b;
+  --bad-soft: #fbe1e2;
+  --good: #1d6b43;
+  --good-soft: #def2e6;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r: 12px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1613; --surface: #17211d; --ink: #e4ece7; --muted: #95a59c; --line: #2a3832;
+    --accent: #6fcca8; --accent-ink: #0a1712; --accent-soft: #1b3229;
+    --soon: #f2c26b; --soon-soft: #3a2c12; --today: #ff9f5a; --today-soft: #3d2210;
+    --bad: #f28b92; --bad-soft: #3b191c; --good: #6fcf97; --good-soft: #15301f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1613; --surface: #17211d; --ink: #e4ece7; --muted: #95a59c; --line: #2a3832;
+  --accent: #6fcca8; --accent-ink: #0a1712; --accent-soft: #1b3229;
+  --soon: #f2c26b; --soon-soft: #3a2c12; --today: #ff9f5a; --today-soft: #3d2210;
+  --bad: #f28b92; --bad-soft: #3b191c; --good: #6fcf97; --good-soft: #15301f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); }
+body {
+  color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.4;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: var(--ink); }
+.wrap { max-width: 620px; margin: 0 auto; padding: 16px 16px 150px; display: grid; gap: 14px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.6rem; letter-spacing: -0.01em; margin: 0; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.15rem; margin: 0; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sub { color: var(--muted); font-size: 0.85rem; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.hint { font-size: 0.86rem; color: var(--muted); margin: 0; }
+
+/* Stat tiles double as filters */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 8px;
+  text-align: left; display: grid; gap: 2px; min-width: 0;
+}
+.stat .v { font-family: var(--f-mono); font-weight: 700; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.stat .k { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat.expired .v { color: var(--bad); }
+.stat.today .v { color: var(--today); }
+.stat.soon .v { color: var(--soon); }
+.stat[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.search {
+  width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  padding: 10px 12px; font-size: 1rem;
+}
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; min-height: 38px; padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); font-weight: 700; font-size: 0.9rem; white-space: nowrap;
+}
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Item rows */
+.group-h { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 2px -4px; }
+.group-h .label { font-size: 0.75rem; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.row {
+  display: grid; grid-template-columns: 6px 54px 1fr auto; gap: 0 12px; align-items: center;
+  width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; text-align: left; padding: 0 12px 0 0; min-height: 76px;
+}
+.row:first-child { border-top: 0; }
+.row .stripe { align-self: stretch; background: transparent; }
+.row.expired .stripe { background: var(--bad); }
+.row.today .stripe { background: var(--today); }
+.row.soon .stripe { background: var(--soon); }
+.row.ok .stripe { background: var(--accent-soft); }
+.row.done .stripe { background: var(--line); }
+.thumb {
+  width: 54px; height: 54px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line);
+  object-fit: contain; display: grid; place-items: center; overflow: hidden; color: var(--muted);
+  font-family: var(--f-display); font-weight: 800; font-size: 1.2rem;
+}
+img.thumb { background: #fff; }
+.row .info { min-width: 0; padding: 10px 0; display: grid; gap: 1px; }
+.row .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.row .meta { font-size: 0.82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .when { text-align: right; display: grid; gap: 4px; justify-items: end; }
+.row .date { font-family: var(--f-mono); font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.badge {
+  display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent);
+}
+.badge.expired { background: var(--bad-soft); color: var(--bad); }
+.badge.today { background: var(--today-soft); color: var(--today); }
+.badge.soon { background: var(--soon-soft); color: var(--soon); }
+.badge.done { background: var(--bg); color: var(--muted); }
+.badge.reduced { background: var(--good-soft); color: var(--good); }
+.empty { text-align: center; padding: 36px 16px; color: var(--muted); display: grid; gap: 10px; justify-items: center; }
+.empty b { color: var(--ink); font-family: var(--f-display); font-size: 1.15rem; }
+
+/* Buttons */
+.primary {
+  min-height: 52px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 700; font-size: 1.05rem; padding: 10px 18px;
+}
+.ghost {
+  min-height: 46px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  padding: 8px 14px; font-weight: 700;
+}
+.ghost.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.link { border: 0; background: none; color: var(--accent); font-weight: 700; padding: 6px 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btns > * { flex: 1 1 140px; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.5; }
+
+/* Floating scan buttons */
+.fab {
+  position: fixed; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  display: flex; gap: 10px; align-items: center;
+}
+.fab .scan {
+  display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 0 24px 0 20px; border: 0; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 1.1rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+}
+.fab .type {
+  width: 52px; height: 52px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.14);
+}
+svg.ic { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Bottom tab bar */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--surface); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(3, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+nav.tabs button {
+  border: 0; background: none; min-height: 62px; display: grid; justify-items: center; align-content: center; gap: 3px;
+  font-size: 0.78rem; font-weight: 700; color: var(--muted);
+}
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+nav.tabs button[aria-current="page"] svg { stroke-width: 2.5; }
+
+/* Bottom sheets */
+.scrim {
+  position: fixed; inset: 0; z-index: 40; background: rgba(8, 14, 11, 0.5); display: flex; align-items: flex-end; justify-content: center;
+  animation: fade 0.15s ease-out;
+}
+.sheet {
+  width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; background: var(--surface);
+  border-radius: 18px 18px 0 0; padding: 10px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 14px; animation: up 0.2s ease-out; overscroll-behavior: contain;
+}
+.sheet .grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); justify-self: center; }
+.sheet-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.x { width: 42px; height: 42px; border-radius: 999px; border: 0; background: var(--bg); font-size: 1.3rem; line-height: 1; }
+@keyframes up { from { transform: translateY(30px); opacity: 0.6; } }
+@keyframes fade { from { opacity: 0; } }
+
+.prod-head { display: grid; grid-template-columns: 104px 1fr; gap: 14px; align-items: start; }
+.photo {
+  width: 104px; height: 104px; border-radius: 12px; border: 1px dashed var(--line); background: var(--bg); padding: 0;
+  display: grid; place-items: center; overflow: hidden; position: relative; color: var(--muted); font-size: 0.78rem; font-weight: 700;
+}
+.photo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.photo .edit {
+  position: absolute; right: 4px; bottom: 4px; background: var(--surface); border-radius: 999px; padding: 2px 7px;
+  font-size: 0.7rem; border: 1px solid var(--line); color: var(--ink);
+}
+.fields { display: grid; gap: 10px; min-width: 0; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.in {
+  width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  padding: 10px 11px; font-size: 1rem;
+}
+.in.big { font-weight: 700; font-size: 1.05rem; }
+.in.mono, input[type=date].in, input[type=time].in { font-family: var(--f-mono); }
+.in[readonly] { color: var(--muted); }
+.code { font-family: var(--f-mono); font-size: 0.9rem; color: var(--muted); overflow-wrap: anywhere; }
+.status {
+  display: flex; gap: 10px; align-items: center; border-radius: 10px; padding: 10px 12px; font-size: 0.92rem;
+  background: var(--bg);
+}
+.status.found { background: var(--good-soft); color: var(--good); }
+.status.notfound { background: var(--soon-soft); color: var(--soon); }
+.status.bad { background: var(--bad-soft); color: var(--bad); }
+.spin { width: 18px; height: 18px; border: 3px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot 0.8s linear infinite; flex: 0 0 auto; }
+@keyframes rot { to { transform: rotate(360deg); } }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick .chip { min-height: 40px; font-family: var(--f-mono); font-size: 0.85rem; }
+.datebig { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.datebig .in { font-size: 1.15rem; font-weight: 700; min-height: 54px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.92rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.menu { display: grid; gap: 8px; }
+.menu button { min-height: 52px; text-align: left; padding: 10px 14px; }
+.big-when { font-family: var(--f-display); font-weight: 800; font-size: 1.6rem; }
+
+.setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.switch { position: relative; width: 52px; height: 30px; flex: 0 0 auto; }
+.switch input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; z-index: 1; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background 0.15s; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(22px); }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  background: var(--ink); color: var(--bg); padding: 11px 16px; border-radius: 10px; font-weight: 700; font-size: 0.92rem;
+  max-width: calc(100% - 32px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); display: flex; gap: 14px; align-items: center;
+}
+.toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 800; text-decoration: underline; padding: 4px 0; }
+.dialog {
+  width: calc(100% - 32px); max-width: 420px; background: var(--surface); border-radius: 16px; padding: 18px; display: grid; gap: 14px;
+  align-self: center; margin-bottom: 30vh; animation: up 0.15s ease-out;
+}
+.file-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<div class="fab" id="fab">
+  <button class="type" id="typeBtn" aria-label="Add without scanning">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <button class="scan" id="scanBtn">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>
+    Scan
+  </button>
+</div>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="dates"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Dates</button>
+  <button data-tab="products"><svg class="ic" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/></svg>Products</button>
+  <button data-tab="settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+</nav>
+
+<div id="layer"></div>
+<input type="file" id="camInput" class="file-hidden" accept="image/*" capture="environment">
+<input type="file" id="galInput" class="file-hidden" accept="image/*">
+<input type="file" id="backupInput" class="file-hidden" accept="application/json,.json">
+
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const Native = window.AndroidBridge || null;
+  const KEY = "ec.data";
+  const $ = (s, el = document) => el.querySelector(s);
+  const app = $("#app"), layer = $("#layer");
+
+  /* ---------- Storage ---------- */
+  const store = {
+    get(k) { try { return Native ? Native.getItem(k) : localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { Native ? Native.setItem(k, v) : localStorage.setItem(k, v); } catch {} },
+  };
+  const blank = () => ({ version: 1, products: {}, items: [], settings: { warnDays: 3, reminderOn: false, reminderTime: "07:00" } });
+  let data = blank();
+  try {
+    const raw = store.get(KEY);
+    if (raw) data = Object.assign(blank(), JSON.parse(raw));
+    data.settings = Object.assign(blank().settings, data.settings || {});
+  } catch {}
+  const save = () => store.set(KEY, JSON.stringify(data));
+
+  /* ---------- Helpers ---------- */
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const pad = n => String(n).padStart(2, "0");
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayISO = () => iso(new Date());
+  const addDays = (n, from) => { const d = from ? parseISO(from) : new Date(); d.setDate(d.getDate() + n); return iso(d); };
+  const addMonths = n => { const d = new Date(); d.setMonth(d.getMonth() + n); return iso(d); };
+  function parseISO(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+  function daysUntil(s) {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return Math.round((parseISO(s) - t) / 86400000);
+  }
+  function fmtDate(s, withDay = true) {
+    const d = parseISO(s), sameYear = d.getFullYear() === new Date().getFullYear();
+    const opts = { day: "numeric", month: "short" };
+    if (withDay) opts.weekday = "short";
+    if (!sameYear) opts.year = "numeric";
+    return d.toLocaleDateString("en-GB", opts);
+  }
+  function relText(n) {
+    if (n < -1) return `Expired ${-n} days ago`;
+    if (n === -1) return "Expired yesterday";
+    if (n === 0) return "Expires today";
+    if (n === 1) return "Tomorrow";
+    return `In ${n} days`;
+  }
+  function shortRel(n) {
+    if (n < 0) return n === -1 ? "1 day ago" : `${-n} days ago`;
+    if (n === 0) return "Today";
+    if (n === 1) return "Tomorrow";
+    return `${n} days`;
+  }
+  const urgency = n => n < 0 ? "expired" : n === 0 ? "today" : n <= data.settings.warnDays ? "soon" : "ok";
+  const imgSrc = im => !im ? "" : /^(data:|https?:|blob:)/.test(im) ? im : "https://img.local/" + encodeURIComponent(im);
+  const initials = name => esc((String(name || "?").trim()[0] || "?").toUpperCase());
+  const thumbHTML = (p, cls = "thumb") => p && p.image
+    ? `<img class="${cls}" src="${esc(imgSrc(p.image))}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'${cls}',textContent:'${initials(p.name)}'}))">`
+    : `<div class="${cls}" aria-hidden="true">${p ? initials(p.name) : "?"}</div>`;
+  const productOf = it => data.products[it.code] || { code: it.code, name: "Unknown item", brand: "" };
+  const isNoBarcode = code => String(code).startsWith("NB-");
+  const displayCode = code => isNoBarcode(code) ? "No barcode" : code;
+  const active = () => data.items.filter(i => i.status === "active");
+  const byExpiry = (a, b) => a.expiry.localeCompare(b.expiry) || productOf(a).name.localeCompare(productOf(b).name);
+
+  let toastTimer;
+  function toast(msg, actionLabel, action) {
+    document.querySelectorAll(".toast").forEach(t => t.remove());
+    const t = document.createElement("div");
+    t.className = "toast"; t.setAttribute("role", "status");
+    t.innerHTML = `<span>${esc(msg)}</span>`;
+    if (actionLabel) {
+      const b = document.createElement("button"); b.textContent = actionLabel;
+      b.onclick = () => { t.remove(); action(); };
+      t.appendChild(b);
+    }
+    document.body.appendChild(t);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.remove(), actionLabel ? 5000 : 2600);
+  }
+
+  /* ---------- Images ---------- */
+  function deleteImageIfUnused(name) {
+    if (!name || /^(data:|https?:|blob:)/.test(name) || !Native) return;
+    const used = Object.values(data.products).some(p => p.image === name);
+    if (!used) Native.deleteImage(name);
+  }
+  function pruneImages() {
+    if (!Native || !Native.pruneImages) return;
+    const keep = Object.values(data.products).map(p => p.image).filter(Boolean);
+    try { Native.pruneImages(JSON.stringify(keep)); } catch {}
+  }
+  async function fileToJpeg(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image(); img.src = url; await img.decode();
+      const max = 700, k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL("image/jpeg", 0.85);
+      if (Native) return Native.saveImage(dataUrl.split(",")[1]) || null;
+      return dataUrl;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  let photoResolve = null;
+  function pickPhoto(fromCamera) {
+    return new Promise(res => {
+      photoResolve = res;
+      const inp = fromCamera ? $("#camInput") : $("#galInput");
+      inp.value = ""; inp.click();
+    });
+  }
+  for (const id of ["#camInput", "#galInput"]) {
+    $(id).addEventListener("change", async e => {
+      const f = e.target.files && e.target.files[0];
+      const res = photoResolve; photoResolve = null;
+      if (!res) return;
+      if (!f) return res(null);
+      try { res(await fileToJpeg(f)); } catch { toast("Couldn't read that photo"); res(null); }
+    });
+  }
+
+  /* ---------- Online lookup ---------- */
+  const pending = {};
+  window.onLookup = (id, r) => { const cb = pending[id]; delete pending[id]; if (cb) cb(r); };
+  function lookup(code) {
+    if (Native) return new Promise(res => { const id = uid(); pending[id] = res; Native.lookup(code, id); });
+    return browserLookup(code);
+  }
+  async function browserLookup(code) {
+    if (!/^\d{6,14}$/.test(code)) return { found: false };
+    const dbs = [["https://world.openfoodfacts.org", "Open Food Facts"], ["https://world.openbeautyfacts.org", "Open Beauty Facts"], ["https://world.openproductsfacts.org", "Open Products Facts"]];
+    const codes = [code]; if (code.length === 12) codes.push("0" + code);
+    let reached = false;
+    for (const c of codes) for (const [base, src] of dbs) {
+      try {
+        const r = await fetch(`${base}/api/v2/product/${c}?fields=product_name,product_name_en,generic_name,brands,quantity,image_front_url,image_url`);
+        reached = true;
+        if (!r.ok) continue;
+        const j = await r.json(); if (j.status !== 1 || !j.product) continue;
+        const p = j.product, name = (p.product_name_en || p.product_name || p.generic_name || "").trim();
+        if (!name) continue;
+        return { found: true, name, brand: String(p.brands || "").split(",")[0].trim(), quantity: (p.quantity || "").trim(), image: p.image_front_url || p.image_url || "", source: src };
+      } catch {}
+    }
+    return reached ? { found: false } : { found: false, offline: true };
+  }
+
+  /* ---------- Scanning ---------- */
+  let scanNextAfterSave = false;
+  window.onScanResult = (code, err) => {
+    if (err) { toast("Scanner problem — type the barcode instead"); openTypeCode(); return; }
+    if (!code) return;
+    handleCode(String(code).trim());
+  };
+  function startScan() {
+    if (Native) { try { Native.scan(); return; } catch {} }
+    openTypeCode();
+  }
+  function handleCode(code) {
+    if (!code) return;
+    openAdd({ code });
+  }
+
+  /* ---------- Navigation & sheets ---------- */
+  const ui = { tab: "dates", filter: "all", q: "", pq: "" };
+  let sheetStack = [];
+  function openSheet(render, onClose) {
+    const scrim = document.createElement("div");
+    scrim.className = "scrim";
+    const sheet = document.createElement("div");
+    sheet.className = "sheet"; sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true");
+    scrim.appendChild(sheet);
+    scrim.addEventListener("click", e => { if (e.target === scrim) closeSheet(); });
+    layer.appendChild(scrim);
+    const entry = { scrim, sheet, onClose, render };
+    sheetStack.push(entry);
+    render(sheet, entry);
+    return entry;
+  }
+  function closeSheet() {
+    const e = sheetStack.pop(); if (!e) return false;
+    e.scrim.remove(); if (e.onClose) e.onClose();
+    return true;
+  }
+  function closeAllSheets() { while (sheetStack.length) closeSheet(); }
+  const sheetHead = title => `<div class="grab"></div><div class="sheet-h"><h2>${esc(title)}</h2><button class="x" data-close aria-label="Close">×</button></div>`;
+  layer.addEventListener("click", e => { if (e.target.closest("[data-close]")) closeSheet(); });
+
+  function confirmBox(message, okLabel = "OK", danger = false) {
+    return new Promise(res => {
+      const scrim = document.createElement("div");
+      scrim.className = "scrim"; scrim.style.alignItems = "center";
+      scrim.innerHTML = `<div class="dialog" role="alertdialog"><div>${esc(message)}</div>
+        <div class="btns"><button class="ghost" data-a="no">Cancel</button><button class="${danger ? "ghost danger" : "primary"}" data-a="yes">${esc(okLabel)}</button></div></div>`;
+      const done = v => { scrim.remove(); sheetStack = sheetStack.filter(s => s.scrim !== scrim); res(v); };
+      scrim.addEventListener("click", e => {
+        const a = e.target.closest("[data-a]");
+        if (a) done(a.dataset.a === "yes"); else if (e.target === scrim) done(false);
+      });
+      layer.appendChild(scrim);
+      sheetStack.push({ scrim, onClose: () => res(false) });
+    });
+  }
+
+  window.onBackButton = () => {
+    if (sheetStack.length) { closeSheet(); return true; }
+    if (ui.tab !== "dates") { setTab("dates"); return true; }
+    return false;
+  };
+  window.onAppResume = () => { if (!sheetStack.length) render(); };
+
+  function setTab(t) { if (t !== ui.tab) ui.filter = "all"; ui.tab = t; render(); window.scrollTo(0, 0); }
+  $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) setTab(b.dataset.tab); });
+  $("#scanBtn").addEventListener("click", startScan);
+  $("#typeBtn").addEventListener("click", openTypeCode);
+
+  /* ---------- Main render ---------- */
+  function render() {
+    document.querySelectorAll("#tabs [data-tab]").forEach(b => {
+      if (b.dataset.tab === ui.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
+    $("#fab").hidden = ui.tab === "settings";
+    if (ui.tab === "dates") renderDates();
+    else if (ui.tab === "products") renderProducts();
+    else renderSettings();
+  }
+
+  function counts() {
+    const c = { expired: 0, today: 0, soon: 0, ok: 0 };
+    for (const it of active()) c[urgency(daysUntil(it.expiry))]++;
+    return c;
+  }
+  function matchesQuery(it, q) {
+    if (!q) return true;
+    const p = productOf(it);
+    return [p.name, p.brand, p.qty, it.code, it.note].join(" ").toLowerCase().includes(q);
+  }
+
+  function itemRow(it) {
+    const p = productOf(it), n = daysUntil(it.expiry);
+    const done = it.status !== "active";
+    const u = done ? "done" : urgency(n);
+    const meta = [p.brand, p.qty].filter(Boolean).join(" · ") || displayCode(it.code);
+    let badge;
+    if (done) badge = `<span class="badge done">${esc(reasonLabel(it.reason))}</span>`;
+    else badge = `<span class="badge ${u === "ok" ? "" : u}">${esc(shortRel(n))}</span>`;
+    const reduced = !done && it.reduced ? ` <span class="badge reduced">Reduced</span>` : "";
+    return `<button class="row ${u}" data-item="${esc(it.id)}">
+      <span class="stripe"></span>${thumbHTML(p)}
+      <span class="info"><span class="name">${esc(p.name)}</span><span class="meta">${esc(meta)}${it.note ? " · " + esc(it.note) : ""}</span></span>
+      <span class="when"><span class="date">${esc(fmtDate(it.expiry))}</span><span>${badge}${reduced}</span></span>
+    </button>`;
+  }
+  const reasonLabel = r => ({ sold: "Sold out", wasted: "Wasted", reduced: "Reduced & sold", other: "Removed" }[r] || "Removed");
+
+  function renderDates() {
+    const c = counts(), w = data.settings.warnDays;
+    const q = ui.q.trim().toLowerCase();
+    const f = ui.filter;
+    let html = `<div class="top"><h1>Expiry dates</h1><span class="sub">${esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }))}</span></div>
+      <div class="stats">
+        <button class="stat expired" data-filter="expired" aria-pressed="${f === "expired"}"><span class="v">${c.expired}</span><span class="k">Expired</span></button>
+        <button class="stat today" data-filter="today" aria-pressed="${f === "today"}"><span class="v">${c.today}</span><span class="k">Today</span></button>
+        <button class="stat soon" data-filter="soon" aria-pressed="${f === "soon"}"><span class="v">${c.soon}</span><span class="k">${w} days</span></button>
+        <button class="stat" data-filter="ok" aria-pressed="${f === "ok"}"><span class="v">${c.ok}</span><span class="k">Later</span></button>
+      </div>
+      <input class="search" id="q" type="search" placeholder="Search name, brand or barcode" value="${esc(ui.q)}" autocomplete="off">
+      <div class="chips" role="group" aria-label="Filter">
+        ${[["all", "All"], ["expired", "Expired"], ["today", "Today"], ["soon", `Next ${w} days`], ["ok", "Later"], ["reduced", "Reduced"], ["history", "Removed"]]
+          .map(([k, l]) => `<button class="chip" data-filter="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}
+      </div>`;
+
+    if (f === "history") {
+      const list = data.items.filter(i => i.status !== "active" && matchesQuery(i, q))
+        .sort((a, b) => (b.removedAt || "").localeCompare(a.removedAt || ""));
+      html += list.length ? `<div class="list">${list.map(itemRow).join("")}</div>`
+        : `<div class="empty"><b>Nothing removed yet</b>Items you take off the shelf show up here.</div>`;
+    } else {
+      let list = active().filter(i => matchesQuery(i, q));
+      if (f === "reduced") list = list.filter(i => i.reduced);
+      else if (f !== "all") list = list.filter(i => urgency(daysUntil(i.expiry)) === f);
+      list.sort(byExpiry);
+      if (!list.length) {
+        html += data.items.length || q
+          ? `<div class="empty"><b>Nothing here</b>${q ? "No matches for that search." : "No items in this group."}</div>`
+          : `<div class="empty"><b>No dates yet</b>Tap <strong>Scan</strong> and scan a barcode to add your first item.</div>`;
+      } else if (f === "all") {
+        const groups = [];
+        const add = (key, label, test) => { const g = list.filter(test); if (g.length) groups.push([key, label, g]); };
+        add("expired", "Expired", i => daysUntil(i.expiry) < 0);
+        add("today", "Today", i => daysUntil(i.expiry) === 0);
+        add("tomorrow", "Tomorrow", i => daysUntil(i.expiry) === 1);
+        add("week", "Next 7 days", i => { const n = daysUntil(i.expiry); return n >= 2 && n <= 7; });
+        add("month", "Next 30 days", i => { const n = daysUntil(i.expiry); return n >= 8 && n <= 30; });
+        add("later", "Later", i => daysUntil(i.expiry) > 30);
+        html += groups.map(([k, l, g]) => `<div class="group-h"><span class="label">${l}</span><span class="sub">${g.length}</span></div>
+          <div class="list">${g.map(itemRow).join("")}</div>`).join("");
+      } else {
+        html += `<div class="list">${list.map(itemRow).join("")}</div>`;
+      }
+    }
+    app.innerHTML = html;
+    const qi = $("#q");
+    qi.addEventListener("input", () => { ui.q = qi.value; const pos = qi.selectionStart; renderDates(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); });
+    app.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => {
+      ui.filter = (b.classList.contains("stat") && ui.filter === b.dataset.filter) ? "all" : b.dataset.filter; renderDates();
+    }));
+    app.querySelectorAll("[data-item]").forEach(b => b.addEventListener("click", () => openItem(b.dataset.item)));
+  }
+
+  function renderProducts() {
+    const q = ui.pq.trim().toLowerCase();
+    const prods = Object.values(data.products)
+      .filter(p => !q || [p.name, p.brand, p.qty, p.code].join(" ").toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const act = active();
+    let html = `<div class="top"><h1>Products</h1><span class="sub">${Object.keys(data.products).length} saved</span></div>
+      <p class="hint">Every product you scan is saved here, so the next scan fills in instantly. Tap one to fix its name or photo.</p>
+      <input class="search" id="pq" type="search" placeholder="Search products" value="${esc(ui.pq)}" autocomplete="off">`;
+    if (!prods.length) {
+      html += `<div class="empty"><b>${q ? "No matches" : "No products yet"}</b>${q ? "" : "Scanned products appear here."}</div>`;
+    } else {
+      html += `<div class="list">${prods.map(p => {
+        const dates = act.filter(i => i.code === p.code).sort(byExpiry);
+        const next = dates[0];
+        const n = next ? daysUntil(next.expiry) : null, u = next ? urgency(n) : "done";
+        return `<button class="row ${next ? u : "done"}" data-prod="${esc(p.code)}"><span class="stripe"></span>${thumbHTML(p)}
+          <span class="info"><span class="name">${esc(p.name)}</span><span class="meta">${esc([p.brand, p.qty].filter(Boolean).join(" · ") || "")}${p.brand || p.qty ? " · " : ""}<span class="code">${esc(displayCode(p.code))}</span></span></span>
+          <span class="when">${next ? `<span class="date">${esc(fmtDate(next.expiry, false))}</span><span class="badge ${u === "ok" ? "" : u}">${dates.length} date${dates.length > 1 ? "s" : ""}</span>` : `<span class="badge done">No dates</span>`}</span></button>`;
+      }).join("")}</div>`;
+    }
+    app.innerHTML = html;
+    const qi = $("#pq");
+    qi.addEventListener("input", () => { ui.pq = qi.value; const pos = qi.selectionStart; renderProducts(); const n = $("#pq"); n.focus(); n.setSelectionRange(pos, pos); });
+    app.querySelectorAll("[data-prod]").forEach(b => b.addEventListener("click", () => openProduct(b.dataset.prod)));
+  }
+
+  function renderSettings() {
+    const s = data.settings;
+    const ver = Native && Native.appVersion ? Native.appVersion() : "web";
+    app.innerHTML = `<div class="top"><h1>Settings</h1></div>
+      <section class="card">
+        <h2>Warning period</h2>
+        <p class="hint">Items expiring within this many days show amber and are counted as "soon".</p>
+        <div class="quick" id="warn">${[1, 2, 3, 5, 7, 14].map(n => `<button class="chip" data-w="${n}" aria-pressed="${s.warnDays === n}">${n} day${n > 1 ? "s" : ""}</button>`).join("")}</div>
+      </section>
+      <section class="card">
+        <div class="setrow"><h2>Daily reminder</h2><label class="switch"><input type="checkbox" id="remOn" ${s.reminderOn ? "checked" : ""} aria-label="Daily reminder"><span></span></label></div>
+        <p class="hint">A notification each day listing anything expired, expiring today or within the warning period.${Native ? "" : " (Works in the Android app.)"}</p>
+        <div class="setrow"><label class="field" style="flex:1"><span class="label">Time</span><input class="in" type="time" id="remTime" value="${esc(s.reminderTime)}"></label>
+          <button class="ghost" id="remTest" style="align-self:end">Send a test</button></div>
+      </section>
+      <section class="card">
+        <h2>Share the list</h2>
+        <p class="hint">Expired items plus everything expiring in the next ${s.warnDays} days — for a handover, a manager, or the morning shelf check.</p>
+        <div class="btns">
+          <button class="primary" id="pdfShare">Share PDF</button>
+          <button class="ghost" id="pdfSave">Save PDF</button>
+        </div>
+        <div class="btns">
+          <button class="ghost" id="textShare">Send as text</button>
+          <button class="ghost" id="csvSave">Export CSV (all)</button>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Backup</h2>
+        <p class="hint">Everything is stored only on this phone. Export a backup (photos included) now and then, and import it on a new phone.</p>
+        <div class="btns"><button class="ghost" id="bkExport">Export backup</button><button class="ghost" id="bkImport">Import backup</button></div>
+        <button class="ghost danger" id="clearHist">Clear removed items older than 30 days</button>
+      </section>
+      <section class="card">
+        <h2>About</h2>
+        <p class="hint">Expiry Check ${esc(ver)}. Product names and photos come from <b>Open Food Facts</b>, Open Beauty Facts, Open Pet Food Facts and Open Products Facts (open data, ODbL), with UPCitemdb as a fallback. Anything they get wrong, you can correct — your version is the one the app keeps.</p>
+      </section>`;
+
+    $("#warn").addEventListener("click", e => {
+      const b = e.target.closest("[data-w]"); if (!b) return;
+      s.warnDays = Number(b.dataset.w); save(); renderSettings();
+    });
+    const applyReminder = () => {
+      const [h, m] = (s.reminderTime || "07:00").split(":").map(Number);
+      if (Native && Native.setReminder) Native.setReminder(!!s.reminderOn, h, m);
+    };
+    $("#remOn").addEventListener("change", e => { s.reminderOn = e.target.checked; save(); applyReminder(); toast(s.reminderOn ? `Reminder set for ${s.reminderTime} each day` : "Reminder off"); });
+    $("#remTime").addEventListener("change", e => { s.reminderTime = e.target.value || "07:00"; save(); applyReminder(); });
+    $("#remTest").addEventListener("click", () => { save(); if (Native && Native.testReminder) { Native.testReminder(); toast("Test notification sent"); } else toast("Notifications work in the Android app"); });
+    $("#pdfShare").addEventListener("click", () => makePdf(true));
+    $("#pdfSave").addEventListener("click", () => makePdf(false));
+    $("#textShare").addEventListener("click", shareText);
+    $("#csvSave").addEventListener("click", exportCsv);
+    $("#bkExport").addEventListener("click", exportBackup);
+    $("#bkImport").addEventListener("click", () => { const i = $("#backupInput"); i.value = ""; i.click(); });
+    $("#clearHist").addEventListener("click", async () => {
+      const cutoff = addDays(-30);
+      const old = data.items.filter(i => i.status !== "active" && (i.removedAt || "").slice(0, 10) < cutoff);
+      if (!old.length) return toast("Nothing that old");
+      if (!(await confirmBox(`Delete ${old.length} removed item${old.length > 1 ? "s" : ""} from the history?`, "Delete", true))) return;
+      data.items = data.items.filter(i => !old.includes(i)); save(); toast("History cleared");
+    });
+  }
+
+  /* ---------- Type a barcode / add without one ---------- */
+  function openTypeCode() {
+    openSheet(sh => {
+      sh.innerHTML = `${sheetHead("Add an item")}
+        <label class="field"><span class="label">Barcode number</span>
+          <input class="in mono big" id="tc" inputmode="numeric" autocomplete="off" placeholder="e.g. 5000112637922"></label>
+        <button class="primary" id="tcGo">Look it up</button>
+        <p class="hint">No barcode, or it won't scan? Add the item by name instead.</p>
+        <button class="ghost" id="tcNone">Add without a barcode</button>`;
+      const inp = $("#tc", sh);
+      setTimeout(() => inp.focus(), 150);
+      const go = () => { const v = inp.value.replace(/\s+/g, ""); if (!v) return inp.focus(); closeSheet(); handleCode(v); };
+      $("#tcGo", sh).onclick = go;
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+      $("#tcNone", sh).onclick = () => { closeSheet(); openAdd({ code: "NB-" + uid().toUpperCase().slice(-6) }); };
+    });
+  }
+
+  /* ---------- Add a date (scan result) ---------- */
+  function openAdd({ code, expiry = "" }) {
+    const known = data.products[code];
+    const draft = known ? { ...known } : { code, name: "", brand: "", qty: "", image: "", source: "" };
+    const st = {
+      draft, expiry, note: "",
+      lookup: known ? "known" : isNoBarcode(code) ? "manual" : "searching",
+      source: known ? known.source : "",
+      dirty: { name: false, brand: false, image: false },
+      createdImages: [], closed: false,
+    };
+    const entry = openSheet(sh => draw(sh), () => {
+      st.closed = true;
+      // Drop photos taken or downloaded for a product that was never saved.
+      if (!st.saved) st.createdImages.forEach(n => { if (n !== (data.products[code] || {}).image) deleteImageIfUnused(n); });
+    });
+
+    function statusHTML() {
+      switch (st.lookup) {
+        case "searching": return `<div class="status"><span class="spin"></span>Searching online for this barcode…</div>`;
+        case "found": return `<div class="status found">Found on ${esc(st.source || "the web")}. Check the name and photo, then pick the date.</div>`;
+        case "notfound": return `<div class="status notfound">Not found online. Type the name and add a photo — it'll be remembered next time.</div>`;
+        case "offline": return `<div class="status bad">No internet connection. Type the name — you can look it up again later from Products.</div>`;
+        case "known": return `<div class="status">Saved product. <button class="link" id="relook" style="margin-left:auto">Look up online again</button></div>`;
+        default: return "";
+      }
+    }
+    function draw(sh) {
+      const d = st.draft;
+      const existing = active().filter(i => i.code === code).sort(byExpiry);
+      const quick = [["Today", 0], ["Tomorrow", 1], ["+3 days", 3], ["+1 week", 7], ["+2 weeks", 14]];
+      sh.innerHTML = `${sheetHead(known ? "Add a date" : "New product")}
+        <div id="stBox">${statusHTML()}</div>
+        <div class="prod-head">
+          <button class="photo" id="photoBtn" aria-label="Product photo">${d.image ? `<img src="${esc(imgSrc(d.image))}" alt="">` : "Add photo"}<span class="edit">${d.image ? "Change" : "+"}</span></button>
+          <div class="fields">
+            <label class="field"><span class="label">Name</span><input class="in big" id="fName" value="${esc(d.name)}" placeholder="${st.lookup === "searching" ? "Searching…" : "Product name"}" autocomplete="off"></label>
+            <label class="field"><span class="label">Brand / size</span><input class="in" id="fBrand" value="${esc([d.brand, d.qty].filter(Boolean).join(" · "))}" placeholder="Optional" autocomplete="off"></label>
+          </div>
+        </div>
+        <div class="code">${isNoBarcode(code) ? "No barcode — added by name" : "Barcode " + esc(code)}</div>
+        ${existing.length ? `<div class="field"><span class="label">Already on the list</span><div class="pills">${existing.map(i => {
+          const n = daysUntil(i.expiry), u = urgency(n);
+          return `<span class="badge ${u === "ok" ? "" : u}">${esc(fmtDate(i.expiry, false))} · ${esc(shortRel(n))}</span>`;
+        }).join("")}</div></div>` : ""}
+        <div class="field"><span class="label">Expiry date</span>
+          <div class="datebig"><input class="in" type="date" id="fDate" value="${esc(st.expiry)}" min="${addDays(-60)}"></div>
+          <div class="quick" id="quick">${quick.map(([l, n]) => `<button class="chip" data-d="${addDays(n)}" aria-pressed="${st.expiry === addDays(n)}">${l}</button>`).join("")}
+            <button class="chip" data-d="${addMonths(1)}" aria-pressed="${st.expiry === addMonths(1)}">+1 month</button></div>
+        </div>
+        <label class="field"><span class="label">Note</span><input class="in" id="fNote" value="${esc(st.note)}" placeholder="Optional — e.g. chiller, back shelf" autocomplete="off"></label>
+        <div class="btns">
+          <button class="primary" id="saveBtn">Save</button>
+          <button class="ghost" id="saveNext">${Native ? "Save & scan next" : "Save & add another"}</button>
+        </div>`;
+
+      const nameIn = $("#fName", sh), brandIn = $("#fBrand", sh), dateIn = $("#fDate", sh), noteIn = $("#fNote", sh);
+      nameIn.addEventListener("input", () => { d.name = nameIn.value; st.dirty.name = true; });
+      brandIn.addEventListener("input", () => { splitBrand(d, brandIn.value); st.dirty.brand = true; });
+      noteIn.addEventListener("input", () => { st.note = noteIn.value; });
+      dateIn.addEventListener("change", () => { st.expiry = dateIn.value; markQuick(); });
+      $("#quick", sh).addEventListener("click", e => {
+        const b = e.target.closest("[data-d]"); if (!b) return;
+        st.expiry = b.dataset.d; dateIn.value = st.expiry; markQuick();
+      });
+      function markQuick() { sh.querySelectorAll("#quick [data-d]").forEach(b => b.setAttribute("aria-pressed", b.dataset.d === st.expiry)); }
+      $("#photoBtn", sh).onclick = () => photoMenu(!!d.image, async choice => {
+        if (choice === "remove") { d.image = ""; st.dirty.image = true; draw(sh); return; }
+        const name = await pickPhoto(choice === "camera");
+        if (!name) return;
+        st.createdImages.push(name); d.image = name; st.dirty.image = true;
+        if (!st.closed) draw(sh);
+      });
+      const relook = $("#relook", sh);
+      if (relook) relook.onclick = () => { st.lookup = "searching"; st.dirty = { name: false, brand: false, image: false }; draw(sh); runLookup(true); };
+      $("#saveBtn", sh).onclick = () => doSave(false);
+      $("#saveNext", sh).onclick = () => doSave(true);
+      if (!d.name && st.lookup !== "searching") setTimeout(() => nameIn.focus(), 200);
+    }
+
+    async function runLookup(force) {
+      const r = await lookup(code);
+      if (st.closed) { if (r && r.found && r.image) deleteImageIfUnused(r.image); return; }
+      const d = st.draft;
+      if (r && r.found) {
+        st.source = r.source || "";
+        if (!st.dirty.name || !d.name) d.name = r.name || d.name;
+        if (!st.dirty.brand) { d.brand = r.brand || ""; d.qty = r.quantity || ""; }
+        if (r.image && (!st.dirty.image || !d.image)) { st.createdImages.push(r.image); d.image = r.image; }
+        d.source = st.source;
+        st.lookup = "found";
+      } else {
+        st.lookup = r && r.offline ? "offline" : force ? "notfound" : "notfound";
+      }
+      draw(entry.sheet);
+    }
+
+    async function doSave(next) {
+      const d = st.draft;
+      d.name = (d.name || "").trim();
+      if (!d.name) { toast("Add the product name first"); $("#fName", entry.sheet).focus(); return; }
+      if (!st.expiry) { toast("Pick the expiry date"); $("#fDate", entry.sheet).focus(); return; }
+      const dup = active().find(i => i.code === code && i.expiry === st.expiry);
+      if (dup && !(await confirmBox(`${d.name} with ${fmtDate(st.expiry)} is already on the list. Add it again?`, "Add again"))) return;
+      const old = data.products[code];
+      data.products[code] = { code, name: d.name, brand: d.brand || "", qty: d.qty || "", image: d.image || "", source: d.source || "", updated: new Date().toISOString() };
+      if (old && old.image && old.image !== d.image) deleteImageIfUnused(old.image);
+      data.items.push({ id: uid(), code, expiry: st.expiry, note: (st.note || "").trim(), status: "active", added: new Date().toISOString(), reduced: false });
+      save();
+      st.saved = true;
+      st.createdImages.filter(n => n !== d.image).forEach(deleteImageIfUnused);
+      closeSheet();
+      render();
+      const n = daysUntil(st.expiry);
+      toast(`Saved — ${relText(n).toLowerCase()}`);
+      if (next) setTimeout(Native ? startScan : openTypeCode, 250);
+    }
+
+    if (st.lookup === "searching") runLookup(false);
+  }
+
+  function splitBrand(d, v) {
+    const parts = v.split("·").map(s => s.trim()).filter(Boolean);
+    d.brand = parts[0] || ""; d.qty = parts.slice(1).join(" · ");
+  }
+
+  function photoMenu(hasPhoto, cb) {
+    openSheet(sh => {
+      sh.innerHTML = `${sheetHead("Product photo")}<div class="menu">
+        <button class="ghost" data-c="camera">Take a photo</button>
+        <button class="ghost" data-c="gallery">Choose from gallery</button>
+        ${hasPhoto ? `<button class="ghost danger" data-c="remove">Remove photo</button>` : ""}</div>`;
+      sh.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (!b) return; closeSheet(); cb(b.dataset.c); });
+    });
+  }
+
+  /* ---------- Item details ---------- */
+  function openItem(id) {
+    const it = data.items.find(i => i.id === id); if (!it) return;
+    openSheet(sh => draw(sh));
+    function draw(sh) {
+      const p = productOf(it), n = daysUntil(it.expiry), u = urgency(n), done = it.status !== "active";
+      sh.innerHTML = `${sheetHead(done ? "Removed item" : "Item")}
+        <div class="prod-head">
+          <div class="photo" style="border-style:solid">${p.image ? `<img src="${esc(imgSrc(p.image))}" alt="">` : initials(p.name)}</div>
+          <div class="fields"><div style="font-weight:700;font-size:1.1rem">${esc(p.name)}</div>
+            <div class="sub">${esc([p.brand, p.qty].filter(Boolean).join(" · "))}</div>
+            <div class="code">${esc(displayCode(it.code))}</div></div>
+        </div>
+        <div><div class="big-when" style="color:var(--${done ? "muted" : u === "ok" ? "accent" : u === "today" ? "today" : u === "soon" ? "soon" : "bad"})">${esc(fmtDate(it.expiry))}</div>
+          <div class="pills" style="margin-top:6px">${done ? `<span class="badge done">${esc(reasonLabel(it.reason))}</span>` : `<span class="badge ${u === "ok" ? "" : u}">${esc(relText(n))}</span>`}${it.reduced && !done ? `<span class="badge reduced">Reduced</span>` : ""}</div></div>
+        <dl class="kv"><dt>Added</dt><dd>${esc(new Date(it.added).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</dd>
+          ${it.note ? `<dt>Note</dt><dd>${esc(it.note)}</dd>` : ""}
+          ${done && it.removedAt ? `<dt>Removed</dt><dd>${esc(new Date(it.removedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}</dd>` : ""}</dl>
+        ${done ? `<div class="menu"><button class="primary" data-a="restore">Put back on the list</button>
+            <button class="ghost danger" data-a="delete">Delete for good</button></div>`
+        : `<div class="field"><span class="label">Off the shelf</span><div class="btns">
+              <button class="primary" data-a="rm-sold">Sold out</button>
+              <button class="ghost" data-a="rm-wasted">Thrown away</button></div></div>
+            <div class="menu">
+              <button class="ghost" data-a="reduce">${it.reduced ? "Unmark reduced" : "Mark as reduced"}</button>
+              <button class="ghost" data-a="date">Change the date</button>
+              <button class="ghost" data-a="note">${it.note ? "Edit note" : "Add a note"}</button>
+              <button class="ghost" data-a="product">Edit product name / photo</button>
+              <button class="ghost" data-a="again">Add another date for this product</button>
+              <button class="ghost danger" data-a="delete">Delete (added by mistake)</button>
+            </div>`}`;
+      sh.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, sh));
+    }
+    async function act(a, sh) {
+      if (a.startsWith("rm-")) {
+        const prev = { status: it.status, reason: it.reason, removedAt: it.removedAt };
+        it.status = "removed"; it.reason = a === "rm-sold" ? (it.reduced ? "reduced" : "sold") : "wasted"; it.removedAt = new Date().toISOString();
+        save(); closeSheet(); render();
+        toast(`${productOf(it).name} removed`, "Undo", () => { Object.assign(it, prev); save(); render(); });
+      } else if (a === "restore") {
+        it.status = "active"; delete it.reason; delete it.removedAt; save(); closeSheet(); render(); toast("Back on the list");
+      } else if (a === "delete") {
+        if (!(await confirmBox("Delete this date? This can't be undone.", "Delete", true))) return;
+        data.items = data.items.filter(i => i !== it); save(); closeSheet(); render(); toast("Deleted");
+      } else if (a === "reduce") {
+        it.reduced = !it.reduced; save(); draw(sh); render();
+      } else if (a === "date") {
+        editField("Change the date", "date", it.expiry, v => { if (v) { it.expiry = v; save(); draw(sh); render(); toast("Date updated"); } });
+      } else if (a === "note") {
+        editField("Note", "text", it.note || "", v => { it.note = (v || "").trim(); save(); draw(sh); render(); });
+      } else if (a === "product") {
+        openProduct(it.code, () => { draw(sh); render(); });
+      } else if (a === "again") {
+        closeSheet(); openAdd({ code: it.code });
+      }
+    }
+  }
+
+  function editField(title, type, value, cb) {
+    openSheet(sh => {
+      sh.innerHTML = `${sheetHead(title)}<input class="in big" id="ef" type="${type}" value="${esc(value)}">
+        <button class="primary" id="efOk">Save</button>`;
+      const inp = $("#ef", sh); setTimeout(() => inp.focus(), 150);
+      const ok = () => { const v = inp.value; closeSheet(); cb(v); };
+      $("#efOk", sh).onclick = ok;
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") ok(); });
+    });
+  }
+
+  /* ---------- Product editor ---------- */
+  function openProduct(code, onDone) {
+    const p = data.products[code]; if (!p) return;
+    const draft = { ...p };
+    const created = [];
+    let saved = false, busy = false;
+    openSheet(sh => draw(sh), () => {
+      if (!saved) created.forEach(n => { if (n !== p.image) deleteImageIfUnused(n); });
+      if (onDone) onDone();
+    });
+    function draw(sh) {
+      const dates = active().filter(i => i.code === code).sort(byExpiry);
+      sh.innerHTML = `${sheetHead("Product")}
+        <div class="prod-head">
+          <button class="photo" id="photoBtn" aria-label="Product photo">${draft.image ? `<img src="${esc(imgSrc(draft.image))}" alt="">` : "Add photo"}<span class="edit">${draft.image ? "Change" : "+"}</span></button>
+          <div class="fields">
+            <label class="field"><span class="label">Name</span><input class="in big" id="pName" value="${esc(draft.name)}" autocomplete="off"></label>
+            <label class="field"><span class="label">Brand / size</span><input class="in" id="pBrand" value="${esc([draft.brand, draft.qty].filter(Boolean).join(" · "))}" placeholder="Optional" autocomplete="off"></label>
+          </div>
+        </div>
+        <div class="code">${isNoBarcode(code) ? "No barcode" : "Barcode " + esc(code)}${draft.source ? " · from " + esc(draft.source) : ""}</div>
+        ${isNoBarcode(code) ? "" : `<button class="ghost" id="relook" ${busy ? "disabled" : ""}>${busy ? "Searching…" : "Look up name & photo online again"}</button>`}
+        <button class="primary" id="pSave">Save changes</button>
+        <div class="field"><span class="label">Dates on the list (${dates.length})</span>
+          ${dates.length ? `<div class="list">${dates.map(itemRow).join("")}</div>` : `<p class="hint">None right now.</p>`}
+          <button class="ghost" id="pAdd">Add a date</button></div>
+        <button class="ghost danger" id="pDel">Delete product${dates.length ? " and its dates" : ""}</button>`;
+      $("#pName", sh).addEventListener("input", e => draft.name = e.target.value);
+      $("#pBrand", sh).addEventListener("input", e => splitBrand(draft, e.target.value));
+      $("#photoBtn", sh).onclick = () => photoMenu(!!draft.image, async c => {
+        if (c === "remove") { draft.image = ""; draw(sh); return; }
+        const n = await pickPhoto(c === "camera"); if (!n) return;
+        created.push(n); draft.image = n; draw(sh);
+      });
+      const rl = $("#relook", sh);
+      if (rl) rl.onclick = async () => {
+        busy = true; draw(sh);
+        const r = await lookup(code);
+        busy = false;
+        if (r && r.found) {
+          draft.name = r.name || draft.name; draft.brand = r.brand || ""; draft.qty = r.quantity || ""; draft.source = r.source || "";
+          if (r.image) { created.push(r.image); draft.image = r.image; }
+          toast(`Found on ${r.source} — tap Save to keep it`);
+        } else toast(r && r.offline ? "No internet connection" : "Not found online");
+        draw(sh);
+      };
+      $("#pSave", sh).onclick = () => {
+        draft.name = (draft.name || "").trim();
+        if (!draft.name) return toast("The name can't be empty");
+        const oldImg = p.image;
+        Object.assign(p, draft, { updated: new Date().toISOString() });
+        saved = true; save();
+        if (oldImg && oldImg !== p.image) deleteImageIfUnused(oldImg);
+        created.filter(n => n !== p.image).forEach(deleteImageIfUnused);
+        closeSheet(); render(); toast("Product saved");
+      };
+      $("#pAdd", sh).onclick = () => { closeAllSheets(); openAdd({ code }); };
+      sh.querySelectorAll("[data-item]").forEach(b => b.onclick = () => openItem(b.dataset.item));
+      $("#pDel", sh).onclick = async () => {
+        if (!(await confirmBox(`Delete ${p.name}${dates.length ? ` and its ${dates.length} date${dates.length > 1 ? "s" : ""}` : ""}? Removed-item history for it is deleted too.`, "Delete", true))) return;
+        data.items = data.items.filter(i => i.code !== code);
+        const img = p.image; delete data.products[code]; save(); deleteImageIfUnused(img);
+        saved = true; closeAllSheets(); render(); toast("Product deleted");
+      };
+    }
+  }
+
+  /* ---------- Reports ---------- */
+  function reportItems() {
+    const w = data.settings.warnDays;
+    return active().filter(i => daysUntil(i.expiry) <= w).sort(byExpiry);
+  }
+  function stamp() { const d = new Date(); return `${iso(d)}_${pad(d.getHours())}${pad(d.getMinutes())}`; }
+  function b64FromString(s) { return btoa(unescape(encodeURIComponent(s))); }
+  function deliver(name, base64, mime, share) {
+    if (Native) {
+      const ok = Native.saveFile(name, base64, mime, share);
+      toast(ok ? (share ? "Choose where to send it" : "Saved to Downloads/Expiry Check") : "Couldn't save the file");
+    } else {
+      const a = document.createElement("a"); a.href = `data:${mime};base64,${base64}`; a.download = name; a.click();
+    }
+  }
+  function imageDataUrl(im) {
+    if (!im) return null;
+    if (im.startsWith("data:")) return im;
+    if (Native && !/^https?:/.test(im)) { const b = Native.readImage(im); return b ? "data:image/jpeg;base64," + b : null; }
+    return null;
+  }
+
+  function makePdf(share) {
+    const list = reportItems();
+    if (!list.length) return toast(`Nothing expired or due in the next ${data.settings.warnDays} days`);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const now = new Date();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text("Expiry check", 14, 16);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text(`${now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`, 14, 22);
+    const c = counts();
+    doc.text(`${c.expired} expired · ${c.today} expire today · ${c.soon} within ${data.settings.warnDays} days`, 14, 27);
+    const imgs = list.map(i => imageDataUrl(productOf(i).image));
+    doc.autoTable({
+      startY: 32,
+      head: [["", "Product", "Barcode", "Expiry", "Status", "Done"]],
+      body: list.map(i => {
+        const p = productOf(i), n = daysUntil(i.expiry);
+        return ["", [p.name, [p.brand, p.qty].filter(Boolean).join(" · "), i.note].filter(Boolean).join("\n"), displayCode(i.code), fmtDate(i.expiry), relText(n) + (i.reduced ? " (reduced)" : ""), ""];
+      }),
+      styles: { fontSize: 9, cellPadding: 2, valign: "middle", minCellHeight: 16 },
+      headStyles: { fillColor: [31, 92, 74], minCellHeight: 8 },
+      columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 32, font: "courier", fontSize: 8 }, 3: { cellWidth: 26 }, 4: { cellWidth: 32 }, 5: { cellWidth: 14 } },
+      didParseCell: h => {
+        if (h.section !== "body" || h.column.index !== 4) return;
+        const n = daysUntil(list[h.row.index].expiry);
+        h.cell.styles.textColor = n < 0 ? [168, 35, 43] : n === 0 ? [179, 71, 0] : [138, 83, 0];
+        h.cell.styles.fontStyle = "bold";
+      },
+      didDrawCell: h => {
+        if (h.section === "body" && h.column.index === 0 && imgs[h.row.index]) {
+          try { doc.addImage(imgs[h.row.index], "JPEG", h.cell.x + 1.5, h.cell.y + 1.5, 13, 13, undefined, "FAST"); } catch {}
+        }
+        if (h.section === "body" && h.column.index === 5) {
+          doc.setDrawColor(120); doc.rect(h.cell.x + 4, h.cell.y + h.cell.height / 2 - 2.5, 5, 5);
+        }
+      },
+    });
+    const b64 = doc.output("datauristring").split(",")[1];
+    deliver(`Expiry-check_${stamp()}.pdf`, b64, "application/pdf", share);
+  }
+
+  function shareText() {
+    const list = reportItems();
+    if (!list.length) return toast(`Nothing expired or due in the next ${data.settings.warnDays} days`);
+    const lines = [`Expiry check — ${new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`];
+    const sec = (title, f) => { const g = list.filter(f); if (g.length) { lines.push("", title.toUpperCase()); g.forEach(i => { const p = productOf(i); lines.push(`• ${p.name}${p.brand ? " (" + p.brand + ")" : ""} — ${fmtDate(i.expiry, false)}${i.reduced ? " [reduced]" : ""}`); }); } };
+    sec("Expired", i => daysUntil(i.expiry) < 0);
+    sec("Today", i => daysUntil(i.expiry) === 0);
+    sec(`Next ${data.settings.warnDays} days`, i => daysUntil(i.expiry) > 0);
+    const text = lines.join("\n");
+    if (Native) Native.shareText(text, "Expiry check");
+    else if (navigator.share) navigator.share({ text }).catch(() => {});
+    else navigator.clipboard.writeText(text).then(() => toast("Copied"));
+  }
+
+  function exportCsv() {
+    const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Product", "Brand", "Size", "Barcode", "Expiry", "Days left", "Status", "Reduced", "Note", "Added", "Removed"]];
+    [...data.items].sort(byExpiry).forEach(i => {
+      const p = productOf(i);
+      rows.push([p.name, p.brand, p.qty, isNoBarcode(i.code) ? "" : i.code, i.expiry, daysUntil(i.expiry),
+        i.status === "active" ? "On shelf" : reasonLabel(i.reason), i.reduced ? "Yes" : "", i.note, (i.added || "").slice(0, 10), (i.removedAt || "").slice(0, 10)]);
+    });
+    const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\r\n");
+    deliver(`Expiry-dates_${stamp()}.csv`, b64FromString(csv), "text/csv", true);
+  }
+
+  function exportBackup() {
+    const images = {};
+    for (const p of Object.values(data.products)) {
+      if (p.image && Native && !/^(data:|https?:)/.test(p.image)) { const b = Native.readImage(p.image); if (b) images[p.image] = b; }
+    }
+    const json = JSON.stringify({ app: "expiry-check", exported: new Date().toISOString(), data, images });
+    deliver(`Expiry-check-backup_${stamp()}.json`, b64FromString(json), "application/json", false);
+  }
+  $("#backupInput").addEventListener("change", async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (j.app !== "expiry-check" || !j.data || !j.data.items) throw new Error("bad");
+      const nP = Object.keys(j.data.products || {}).length, nI = j.data.items.length;
+      if (!(await confirmBox(`Replace everything on this phone with the backup (${nP} products, ${nI} dates)?`, "Replace", true))) return;
+      for (const [name, b64] of Object.entries(j.images || {})) {
+        if (Native) Native.saveImageAs(name, b64);
+        else for (const p of Object.values(j.data.products)) if (p.image === name) p.image = "data:image/jpeg;base64," + b64;
+      }
+      data = Object.assign(blank(), j.data);
+      data.settings = Object.assign(blank().settings, data.settings || {});
+      save(); pruneImages();
+      const [h, m] = data.settings.reminderTime.split(":").map(Number);
+      if (Native && Native.setReminder) Native.setReminder(!!data.settings.reminderOn, h, m);
+      render(); toast("Backup restored");
+    } catch { toast("That isn't an Expiry Check backup"); }
+  });
+
+  /* ---------- Start ---------- */
+  render();
+  pruneImages();
+})();
+</script>
+</body>
+</html>
