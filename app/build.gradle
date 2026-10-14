@@ -44,6 +44,8 @@ android {
 }
 
 dependencies {
+    // Lines up the Kotlin library versions pulled in by Google's libraries (avoids duplicate classes).
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
     // Google's barcode scanner: opens its own camera screen, so the app needs no camera permission.
     implementation 'com.google.android.gms:play-services-code-scanner:16.1.0'
     // FileProvider, for handing the camera app a place to save product photos.
